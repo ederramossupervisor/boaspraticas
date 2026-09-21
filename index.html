@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Painel do Avaliador · Prêmio Sedu Boas Práticas</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <p class="eyebrow">Secretaria da Educação · Espírito Santo</p>
+    <h1>Painel do Avaliador</h1>
+    <p class="subtitle">Prêmio Sedu: Boas Práticas na Educação — 19ª edição</p>
+  </div>
+  <svg class="topbar-wave" viewBox="0 0 1200 60" preserveAspectRatio="none">
+    <path d="M0,30 C300,60 900,0 1200,30 L1200,60 L0,60 Z" fill="#FBF7EE" />
+  </svg>
+</header>
+
+<main class="wrap">
+
+  <!-- Identificação do avaliador (sempre visível) -->
+  <section class="card" id="card-avaliador">
+    <h2>Quem está avaliando</h2>
+    <p class="hint">Selecione seu nome para carregar seus relatos e avaliações salvas.</p>
+    <div class="grid-2">
+      <label>
+        <span>Nome do avaliador</span>
+        <select id="inputNomeAvaliador">
+          <option value="">Selecione seu nome</option>
+        </select>
+      </label>
+      <div class="actions-inline">
+        <button class="btn btn-secondary" id="btnCarregar">Carregar minhas avaliações</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Cadastro de relatos do avaliador -->
+  <section class="card" id="card-relatos" hidden>
+    <h2>Meus relatos</h2>
+    <p class="hint">Cadastre os números dos relatos que você vai avaliar. Eles aparecem para seleção no formulário abaixo.</p>
+    <div class="grid-2">
+      <label>
+        <span>Número do relato</span>
+        <input id="inputNovoRelato" type="text" placeholder="Ex.: 014" />
+      </label>
+      <div class="actions-inline">
+        <button class="btn btn-secondary" id="btnCadastrarRelato">Cadastrar relato</button>
+      </div>
+    </div>
+    <div id="listaRelatosCadastrados" class="chips-wrap">
+      <p class="hint">Nenhum relato cadastrado ainda.</p>
+    </div>
+  </section>
+
+  <!-- Tabs -->
+  <nav class="tabs">
+    <button class="tab active" data-tab="form">Nova avaliação</button>
+    <button class="tab" data-tab="resumo">Resumo dos relatos <span id="badgeCount" class="badge-count" hidden>0</span></button>
+  </nav>
+
+  <!-- ===== TAB: FORMULÁRIO ===== -->
+  <section id="tab-form" class="tab-panel">
+    <div class="layout">
+      <div class="col-main">
+
+        <div class="card">
+          <h2>Identificação do relato</h2>
+          <div class="grid-2">
+            <label>
+              <span>Número do relato</span>
+              <select id="inputRelato">
+                <option value="">Selecione um relato cadastrado</option>
+              </select>
+            </label>
+            <label>
+              <span>Categoria</span>
+              <select id="inputCategoria">
+                <option value="">Escolher</option>
+                <option>Boas Práticas na Sala de Aula</option>
+                <option>Boas Práticas na Gestão Escolar</option>
+              </select>
+            </label>
+            <label>
+              <span>SRE de origem (opcional)</span>
+              <input id="inputSre" type="text" placeholder="Ex.: Cariacica" />
+            </label>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>Condição de participação</h2>
+          <p class="hint">O relato atende aos pré-requisitos da Portaria 177-R, de 30 de junho de 2026?</p>
+          <div class="pill-group" id="condicaoGroup">
+            <button type="button" class="pill" data-value="deferido">Deferido</button>
+            <button type="button" class="pill" data-value="indeferido">Indeferido</button>
+          </div>
+          <div class="notice notice-yellow" id="avisoIndeferido" hidden>
+            Relatos indeferidos não são pontuados nos critérios. Preencha apenas a justificativa.
+          </div>
+        </div>
+
+        <div id="criteriosWrap"><!-- critérios são renderizados via JS --></div>
+
+        <div class="card">
+          <h2>Justificativa</h2>
+          <ul class="hint-list">
+            <li>Aponte pontos fortes e pontos de melhoria</li>
+            <li>Aborde os quatro critérios avaliados</li>
+            <li>Mantenha coerência com as notas atribuídas</li>
+            <li>Evite feedback raso, erros pontuais de português ou tom ofensivo</li>
+          </ul>
+          <textarea id="inputJustificativa" rows="6" placeholder="Escreva aqui a justificativa consistente e objetiva..."></textarea>
+        </div>
+
+        <div class="card">
+          <button type="button" class="collapsible-toggle" id="toggleArbitro">
+            <span>⚖️ Sou avaliador árbitro para este relato</span>
+            <span class="chev">▾</span>
+          </button>
+          <div id="arbitroBody" hidden>
+            <div class="notice notice-pink">
+              Situação de discrepância: relato indeferido por um avaliador e avaliado por outro,
+              ou diferença de notas igual ou superior a 30% entre os avaliadores. Sua nova nota
+              será considerada a nota final.
+            </div>
+            <label>
+              <span>Notas e justificativas dos avaliadores anteriores (referência)</span>
+              <textarea id="inputArbitragem" rows="4" placeholder="Cole aqui as notas e justificativas recebidas..."></textarea>
+            </label>
+          </div>
+        </div>
+
+        <label class="declaracao card">
+          <input type="checkbox" id="inputDeclarado" />
+          <span>Declaro que todas as informações preenchidas são relativas à avaliação do relato indicado acima.</span>
+        </label>
+
+      </div>
+
+      <aside class="col-side">
+        <div class="score-card" id="scoreCard">
+          <p class="score-label">Nota final calculada</p>
+          <p class="score-value" id="scoreValue">0.0</p>
+          <p class="score-sub" id="scoreSub">de 100 pontos</p>
+          <div id="scoreBars"></div>
+        </div>
+
+        <div class="card">
+          <p class="hint" id="progressoTexto">Preencha os itens para calcular a nota.</p>
+          <button type="button" class="btn btn-primary btn-block" id="btnSalvar">Salvar avaliação</button>
+          <button type="button" class="btn btn-ghost btn-block" id="btnNovo">Novo relato (limpar formulário)</button>
+          <p class="save-status" id="saveStatus"></p>
+        </div>
+      </aside>
+    </div>
+  </section>
+
+  <!-- ===== TAB: RESUMO ===== -->
+  <section id="tab-resumo" class="tab-panel" hidden>
+    <div class="card">
+      <div class="resumo-head">
+        <h2>Meus relatos avaliados</h2>
+        <div class="resumo-actions">
+          <button type="button" class="btn btn-ghost" id="btnSelecionarTodos">Selecionar todos</button>
+          <button type="button" class="btn btn-secondary" id="btnCopiarResumo">Copiar resumo completo</button>
+          <button type="button" class="btn btn-secondary" id="btnExibirTela">Exibir notas na tela</button>
+          <button type="button" class="btn btn-primary" id="btnPdfSelecionados">Baixar PDF (selecionados)</button>
+          <button type="button" class="btn btn-primary" id="btnPdfTodos">Baixar PDF (todos)</button>
+        </div>
+      </div>
+      <p class="hint">Use esta lista para conferir notas item por item e justificativas antes de preencher o formulário oficial da Sedu.</p>
+      <div id="resumoLista" class="resumo-lista">
+        <p class="empty-state">Nenhuma avaliação carregada ainda. Selecione seu nome acima.</p>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="footer">
+  <p>premio.sedu@edu.es.gov.br · (27) 3636-7712</p>
+</footer>
+
+<!-- Botão flutuante: consulta rápida dos critérios -->
+<button type="button" class="fab-criterios" id="btnAbrirCriterios" onclick="abrirModalCriterios()" title="Consultar escala de notas">
+  📊 <span>Escala de notas</span>
+</button>
+
+<div class="modal-overlay" id="modalCriteriosOverlay" onclick="if(event.target.id==='modalCriteriosOverlay') document.getElementById('modalCriteriosOverlay').classList.remove('open')">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h2>Escala de notas</h2>
+      <button type="button" class="modal-close" id="btnFecharCriterios" onclick="document.getElementById('modalCriteriosOverlay').classList.remove('open')">✕</button>
+    </div>
+    <div class="modal-body" id="modalCriteriosBody"><!-- renderizado via JS --></div>
+  </div>
+</div>
+
+<script src="jspdf.umd.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
