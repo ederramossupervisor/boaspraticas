@@ -8,7 +8,7 @@ const CONFIG = {
 };
 
 /* ==========================================================
-   CRITÉRIOS DE AVALIAÇÃO (Portaria 157-R / Manual do Avaliador)
+   CRITÉRIOS DE AVALIAÇÃO (Portaria 177-R / Manual do Avaliador)
    ========================================================== */
 const CRITERIA = [
   {
@@ -16,7 +16,7 @@ const CRITERIA = [
     title: "Aspectos formais",
     maxPoints: 5,
     items: [
-      { id: "i1", peso: 2.5, label: "Relato estruturado de acordo com o Artigo 5º e o Anexo IV da Portaria nº 157-R" },
+      { id: "i1", peso: 2.5, label: "Relato estruturado de acordo com as normas da Portaria nº 177-R e o Anexo VI" },
       { id: "i2", peso: 2.5, label: "Adequação da escrita à Norma-Padrão da Língua Portuguesa" },
     ],
   },
@@ -39,7 +39,7 @@ const CRITERIA = [
     title: "Monitoramento e efetividade dos resultados",
     maxPoints: 30,
     items: [
-      { id: "iii1", peso: 10, label: "Demonstração dos instrumentos para monitorar e mensurar os resultados" },
+      { id: "iii1", peso: 10, label: "Demonstração dos instrumentos de monitoramento de práticas e processos" },
       { id: "iii2", peso: 10, label: "Evidências dos resultados obtidos" },
       { id: "iii3", peso: 10, label: "Demonstração dos impactos positivos para a comunidade escolar" },
     ],
@@ -51,7 +51,7 @@ const CRITERIA = [
     items: [
       { id: "iv1", peso: 8.3, label: "Criatividade e ineditismo da proposta" },
       { id: "iv2", peso: 8.3, label: "Efetividade da utilização das metodologias inovadoras no contexto da unidade escolar" },
-      { id: "iv3", peso: 8.3, label: "Evidências de engajamento e envolvimento da comunidade escolar para o sucesso da ação" },
+      { id: "iv3", peso: 8.3, label: "Evidência de engajamento e envolvimento da comunidade escolar para o sucesso da ação" },
     ],
   },
 ];
