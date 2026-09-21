@@ -247,6 +247,59 @@ textarea { resize: vertical; }
 
 .footer { text-align: center; color: var(--muted); font-size: 12px; padding: 20px 0 40px; }
 
+/* ===== Notificações do sistema (toast) ===== */
+.toast-container {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: min(360px, calc(100vw - 32px));
+}
+.toast {
+  background: var(--navy);
+  color: var(--cream);
+  border-radius: 12px;
+  padding: 12px 16px;
+  font-size: 13.5px;
+  font-weight: 500;
+  box-shadow: 0 8px 24px rgba(34, 38, 91, 0.35);
+  opacity: 0;
+  transform: translateY(-8px);
+  transition: opacity 200ms, transform 200ms;
+}
+.toast.show { opacity: 1; transform: translateY(0); }
+.toast-error { background: var(--danger); }
+.toast-success { background: #2E8B57; }
+
+@media (max-width: 560px) {
+  .toast-container { left: 16px; right: 16px; max-width: none; }
+}
+
+/* ===== Confirmação customizada (substitui confirm() nativo) ===== */
+.confirm-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(32, 34, 58, 0.55);
+  z-index: 150;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.confirm-overlay.open { display: flex; }
+.confirm-box {
+  background: var(--paper);
+  border-radius: 16px;
+  padding: 22px;
+  width: 100%;
+  max-width: 380px;
+}
+.confirm-message { margin: 0 0 18px; font-size: 14.5px; color: var(--ink); line-height: 1.5; }
+.confirm-actions { display: flex; justify-content: flex-end; gap: 10px; }
+
 /* ===== Relatos cadastrados, seleção e detalhamento por item ===== */
 
 .resumo-actions { display: flex; gap: 8px; flex-wrap: wrap; }
