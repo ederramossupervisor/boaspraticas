@@ -293,6 +293,56 @@ document.addEventListener("keydown", (e) => {
 });
 
 /* ==========================================================
+   NOTIFICAÇÕES DO SISTEMA (toast) E CONFIRMAÇÃO
+   Substituem alert()/confirm() nativos do navegador pelo
+   visual do próprio painel.
+   ========================================================== */
+function showToast(message, type = "info") {
+  let container = document.getElementById("toastContainer");
+  if (!container) {
+    container = document.createElement("div");
+    container.id = "toastContainer";
+    container.className = "toast-container";
+    document.body.appendChild(container);
+  }
+  const toast = document.createElement("div");
+  toast.className = `toast toast-${type}`;
+  toast.textContent = message;
+  container.appendChild(toast);
+  requestAnimationFrame(() => toast.classList.add("show"));
+  setTimeout(() => {
+    toast.classList.remove("show");
+    setTimeout(() => toast.remove(), 250);
+  }, 4000);
+}
+
+function showConfirm(message) {
+  return new Promise((resolve) => {
+    const overlay = document.createElement("div");
+    overlay.className = "confirm-overlay open";
+    overlay.innerHTML = `
+      <div class="confirm-box">
+        <p class="confirm-message"></p>
+        <div class="confirm-actions">
+          <button type="button" class="btn btn-ghost" data-confirm="cancel">Cancelar</button>
+          <button type="button" class="btn btn-primary" data-confirm="ok">Confirmar</button>
+        </div>
+      </div>`;
+    overlay.querySelector(".confirm-message").textContent = message;
+    document.body.appendChild(overlay);
+    const cleanup = (result) => {
+      overlay.remove();
+      resolve(result);
+    };
+    overlay.querySelector('[data-confirm="ok"]').addEventListener("click", () => cleanup(true));
+    overlay.querySelector('[data-confirm="cancel"]').addEventListener("click", () => cleanup(false));
+    overlay.addEventListener("click", (e) => {
+      if (e.target === overlay) cleanup(false);
+    });
+  });
+}
+
+/* ==========================================================
    AVALIADOR — dropdown e troca
    ========================================================== */
 async function carregarAvaliadoresDropdown() {
@@ -399,7 +449,7 @@ function garantirOpcaoRelato(relato) {
 document.getElementById("btnCadastrarRelato").addEventListener("click", async () => {
   const nome = document.getElementById("inputNomeAvaliador").value;
   const relato = document.getElementById("inputNovoRelato").value.trim();
-  if (!nome) return alert("Selecione seu nome de avaliador primeiro.");
+  if (!nome) return showToast("Selecione seu nome de avaliador primeiro.", "error");
   if (!relato) return;
   try {
     const relatos = await chamarBackend("cadastrarRelato", { avaliador: nome, relato });
@@ -408,21 +458,22 @@ document.getElementById("btnCadastrarRelato").addEventListener("click", async ()
     renderSelectRelato();
     document.getElementById("inputNovoRelato").value = "";
   } catch (err) {
-    alert("Erro ao cadastrar relato: " + err.message);
+    showToast("Erro ao cadastrar relato: " + err.message, "error");
   }
 });
 
 async function removerRelatoCadastrado(relato) {
   const nome = document.getElementById("inputNomeAvaliador").value;
   if (!nome) return;
-  if (!confirm(`Remover o relato ${relato} da sua lista de cadastro? (Isso não apaga uma avaliação já salva.)`)) return;
+  const ok = await showConfirm(`Remover o relato ${relato} da sua lista de cadastro? (Isso não apaga uma avaliação já salva.)`);
+  if (!ok) return;
   try {
     const relatos = await chamarBackend("excluirRelatoCadastrado", { avaliador: nome, relato });
     state.relatosCadastrados = relatos || [];
     renderRelatosCadastrados();
     renderSelectRelato();
   } catch (err) {
-    alert("Erro ao remover relato: " + err.message);
+    showToast("Erro ao remover relato: " + err.message, "error");
   }
 }
 
@@ -562,7 +613,8 @@ async function carregarAvaliacoes(nome) {
 }
 
 async function excluirAvaliacao(id) {
-  if (!confirm("Excluir esta avaliação salva?")) return;
+  const ok = await showConfirm("Excluir esta avaliação salva?");
+  if (!ok) return;
   try {
     await chamarBackend("excluir", { id });
     state.minhasAvaliacoes = state.minhasAvaliacoes.filter((a) => a.id !== id);
@@ -572,7 +624,7 @@ async function excluirAvaliacao(id) {
     const nome = document.getElementById("inputNomeAvaliador").value;
     if (nome) carregarRelatosCadastrados(nome);
   } catch (err) {
-    alert("Erro ao excluir: " + err.message);
+    showToast("Erro ao excluir: " + err.message, "error");
   }
 }
 
@@ -686,7 +738,7 @@ function renderResumo() {
         btn.textContent = "Copiado!";
         setTimeout(() => (btn.textContent = original), 1500);
       } catch (e) {
-        alert("Não foi possível copiar automaticamente. Selecione o texto manualmente.");
+        showToast("Não foi possível copiar automaticamente. Selecione o texto manualmente.", "error");
       }
     })
   );
@@ -732,7 +784,7 @@ document.getElementById("btnPdfSelecionados").addEventListener("click", () => {
 
 async function gerarPdf(lista) {
   if (!lista.length) {
-    alert("Nenhum relato selecionado.");
+    showToast("Nenhum relato selecionado.", "error");
     return;
   }
   const { jsPDF } = window.jspdf;
@@ -864,7 +916,7 @@ document.getElementById("btnCopiarResumo").addEventListener("click", async () =>
     btn.textContent = "Copiado!";
     setTimeout(() => (btn.textContent = original), 1500);
   } catch (e) {
-    alert("Não foi possível copiar automaticamente. Selecione o texto manualmente.");
+    showToast("Não foi possível copiar automaticamente. Selecione o texto manualmente.", "error");
   }
 });
 
