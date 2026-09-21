@@ -628,7 +628,14 @@ function renderResumo() {
             </label>
             <div class="relato-nota">${nota}<small>${av.condicao === "indeferido" ? "" : "/ 100"}</small></div>
           </div>
-          ${av.justificativa ? `<p class="relato-justif">${escapeHtml(av.justificativa)}</p>` : ""}
+          ${av.justificativa ? `
+          <div class="relato-justif-wrap">
+            <div class="relato-justif-head">
+              <span class="relato-justif-label">Justificativa</span>
+              <button type="button" class="btn-copy-justif" data-copy-justif="${av.id}" title="Copiar justificativa">📋 Copiar</button>
+            </div>
+            <p class="relato-justif">${escapeHtml(av.justificativa)}</p>
+          </div>` : ""}
           <div class="relato-actions">
             <button class="btn btn-ghost" data-edit="${av.id}">Editar</button>
             <button class="btn btn-ghost" data-toggle-itens="${av.id}">${aberto ? "Ocultar notas por item" : "Ver notas por item"}</button>
@@ -667,6 +674,20 @@ function renderResumo() {
     btn.addEventListener("click", () => {
       const av = state.minhasAvaliacoes.find((a) => a.id === btn.dataset.pdf);
       if (av) gerarPdf([av]);
+    })
+  );
+  lista.querySelectorAll("[data-copy-justif]").forEach((btn) =>
+    btn.addEventListener("click", async () => {
+      const av = state.minhasAvaliacoes.find((a) => a.id === btn.dataset.copyJustif);
+      if (!av || !av.justificativa) return;
+      try {
+        await navigator.clipboard.writeText(av.justificativa);
+        const original = btn.textContent;
+        btn.textContent = "Copiado!";
+        setTimeout(() => (btn.textContent = original), 1500);
+      } catch (e) {
+        alert("Não foi possível copiar automaticamente. Selecione o texto manualmente.");
+      }
     })
   );
 }
