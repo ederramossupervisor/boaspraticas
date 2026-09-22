@@ -1,10 +1,14 @@
 /* ==========================================================
    CONFIGURAÇÃO
    Depois de publicar o Code.gs como app da Web, cole aqui a
-   URL gerada (termina em /exec).
+   URL gerada (termina em /exec). O GOOGLE_CLIENT_ID vem do
+   Google Cloud Console (Credenciais > ID do cliente OAuth 2.0,
+   tipo "Aplicativo da Web", com https://ederramossupervisor.github.io
+   cadastrado em "Origens JavaScript autorizadas").
    ========================================================== */
 const CONFIG = {
   API_URL: "https://script.google.com/macros/s/AKfycbzqEu5r1OzENBSBqnSrSaKNBm55dUAUKO9TZQq3YNclVvH1nZfAL29tZzHcQ0yF77lpuA/exec",
+  GOOGLE_CLIENT_ID: "334461562425-cvr9lr9726sll3i980i2oi0rdjtj0mpo.apps.googleusercontent.com",
 };
 
 /* ==========================================================
@@ -69,7 +73,8 @@ let state = {
   relatosCadastrados: [], // relatos cadastrados pelo avaliador atual
   selecionados: new Set(), // ids de avaliações selecionadas no resumo (para PDF em lote)
   itensAbertos: new Set(), // ids de avaliações com o detalhamento por item expandido
-  avaliadorAtual: { nome: "", sre: "" }, // avaliador selecionado (nome + SRE fixa dele)
+  avaliadorAtual: { nome: "", sre: "" }, // avaliador identificado (nome + SRE fixa dele)
+  idToken: null, // JWT do Google Identity Services, obtido no login
 };
 
 /* ==========================================================
@@ -344,25 +349,70 @@ function showConfirm(message) {
 }
 
 /* ==========================================================
-   AVALIADOR — identificação automática pela conta Google
+   AVALIADOR — login com Google (Google Identity Services) e
+   identificação via verificação do token no backend
    ========================================================== */
-// Cada avaliador tem nome/SRE fixos cadastrados na planilha, ligados
-// ao e-mail da conta Google dele. O backend identifica quem está
-// logado pela sessão (não pelo que o front-end envia), então aqui só
-// exibimos o resultado — não há mais seleção manual de nome/SRE.
+// O front-end fica no GitHub Pages (domínio diferente do Apps
+// Script), então não dá pra usar a sessão nativa do Apps Script
+// (Session.getActiveUser()) — ela exige o mesmo domínio e quebra
+// CORS. Em vez disso, o usuário faz login pelo botão do Google
+// aqui no navegador, a gente pega o idToken (JWT) que isso gera, e
+// manda esse token em toda chamada ao backend. O Code.gs verifica
+// o token direto com o Google e só então sabe quem é o avaliador.
+
+function initGoogleSignIn() {
+  if (!window.google || !google.accounts || !google.accounts.id) {
+    setTimeout(initGoogleSignIn, 300); // biblioteca do Google ainda carregando
+    return;
+  }
+  google.accounts.id.initialize({
+    client_id: CONFIG.GOOGLE_CLIENT_ID,
+    callback: handleGoogleCredential,
+  });
+  google.accounts.id.renderButton(document.getElementById("gSignInButton"), {
+    theme: "outline",
+    size: "large",
+    text: "signin_with",
+    locale: "pt-BR",
+  });
+}
+
+async function handleGoogleCredential(response) {
+  state.idToken = response.credential;
+  await identificarESelecionar();
+}
+
+function mostrarBotaoLogin() {
+  document.getElementById("googleSignInBox").hidden = false;
+  document.getElementById("identidadeStatus").hidden = true;
+  document.getElementById("btnCarregar").hidden = true;
+  document.getElementById("btnSair").hidden = true;
+}
+
 async function identificarESelecionar() {
   const status = document.getElementById("identidadeStatus");
   const btnCarregar = document.getElementById("btnCarregar");
-  status.textContent = "Identificando sua conta Google...";
+  const btnSair = document.getElementById("btnSair");
+  document.getElementById("googleSignInBox").hidden = true;
+  status.hidden = false;
+  status.textContent = "Verificando sua conta Google...";
   btnCarregar.hidden = true;
+  btnSair.hidden = true;
   try {
     const identidade = await chamarBackend("identificarAvaliador", {});
     status.textContent = `Você está avaliando como: ${identidade.nome} — SRE ${identidade.sre || "não informada"}`;
     btnCarregar.hidden = false;
+    btnSair.hidden = false;
     await selecionarAvaliador(identidade.nome, identidade.sre);
   } catch (err) {
     status.textContent = "Não foi possível identificar você: " + err.message;
+    state.idToken = null;
     await selecionarAvaliador("", "");
+    // Mostra o botão de login de novo para a pessoa tentar com outra conta.
+    document.getElementById("googleSignInBox").hidden = false;
+    if (window.google && google.accounts && google.accounts.id) {
+      google.accounts.id.disableAutoSelect();
+    }
   }
 }
 
@@ -386,6 +436,14 @@ async function selecionarAvaliador(nome, sre) {
 
 document.getElementById("btnCarregar").addEventListener("click", () => {
   identificarESelecionar();
+});
+document.getElementById("btnSair").addEventListener("click", () => {
+  state.idToken = null;
+  selecionarAvaliador("", "");
+  if (window.google && google.accounts && google.accounts.id) {
+    google.accounts.id.disableAutoSelect();
+  }
+  mostrarBotaoLogin();
 });
 
 /* ==========================================================
@@ -573,7 +631,7 @@ async function chamarBackend(action, payload) {
   const resp = await fetch(CONFIG.API_URL, {
     method: "POST",
     headers: { "Content-Type": "text/plain;charset=utf-8" }, // evita preflight CORS
-    body: JSON.stringify({ action, ...payload }),
+    body: JSON.stringify({ action, idToken: state.idToken, ...payload }),
   });
   const data = await resp.json();
   if (!data.ok) throw new Error(data.error || "Erro desconhecido no servidor.");
@@ -932,4 +990,4 @@ document.getElementById("btnCopiarResumo").addEventListener("click", async () =>
    ========================================================== */
 renderCriterios();
 renderScoreCard();
-identificarESelecionar();
+initGoogleSignIn();
