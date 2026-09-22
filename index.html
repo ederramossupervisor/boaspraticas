@@ -29,9 +29,14 @@
   <!-- Identificação do avaliador (sempre visível) -->
   <section class="card" id="card-avaliador">
     <h2>Quem está avaliando</h2>
-    <p class="hint" id="identidadeStatus">Identificando sua conta Google...</p>
+    <div id="googleSignInBox">
+      <p class="hint">Entre com sua conta Google para carregar seus relatos e avaliações salvas.</p>
+      <div id="gSignInButton"></div>
+    </div>
+    <p class="hint" id="identidadeStatus" hidden></p>
     <div class="actions-inline">
       <button class="btn btn-secondary" id="btnCarregar" hidden>Atualizar minhas avaliações</button>
+      <button class="btn btn-ghost" id="btnSair" hidden>Sair</button>
     </div>
   </section>
 
@@ -197,6 +202,7 @@
   </div>
 </div>
 
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="jspdf.umd.min.js"></script>
 <script src="app.js"></script>
 </body>
