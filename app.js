@@ -378,6 +378,7 @@ function initGoogleSignIn() {
 }
 
 async function handleGoogleCredential(response) {
+  console.log("credential recebido:", response.credential ? response.credential.length : "vazio", response.credential);
   state.idToken = response.credential;
   await identificarESelecionar();
 }
