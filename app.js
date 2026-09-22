@@ -346,46 +346,62 @@ function showConfirm(message) {
 /* ==========================================================
    AVALIADOR — dropdown e troca
    ========================================================== */
-// Separador interno para combinar nome + SRE no value da <option>.
-// Cada avaliador tem uma SRE fixa (cadastrada na aba "Avaliadores"),
-// então o mesmo nome pode existir em SREs diferentes sem se misturar.
-const SEP_AVALIADOR = "::";
-
-function codificarAvaliador_(nome, sre) {
-  return `${nome}${SEP_AVALIADOR}${sre || ""}`;
-}
-function decodificarAvaliador_(value) {
-  const idx = value.indexOf(SEP_AVALIADOR);
-  if (idx === -1) return { nome: value, sre: "" };
-  return { nome: value.slice(0, idx), sre: value.slice(idx + SEP_AVALIADOR.length) };
-}
+// Cada avaliador tem uma SRE fixa. O avaliador primeiro escolhe a SRE,
+// e só então o campo "Nome" é liberado, já filtrado para mostrar
+// apenas os avaliadores daquela SRE.
+let avaliadoresCarregados = []; // [{nome, sre}], carregado uma vez do backend
 
 async function carregarAvaliadoresDropdown() {
-  const select = document.getElementById("inputNomeAvaliador");
+  const selectSre = document.getElementById("inputSreAvaliador");
   try {
-    const avaliadores = await chamarBackend("listarAvaliadores", {});
-    (avaliadores || [])
-      .slice()
-      .sort((a, b) => (a.sre || "").localeCompare(b.sre || "", "pt") || a.nome.localeCompare(b.nome, "pt"))
-      .forEach(({ nome, sre }) => {
-        const opt = document.createElement("option");
-        opt.value = codificarAvaliador_(nome, sre);
-        opt.textContent = sre ? `${nome} — SRE ${sre}` : nome;
-        select.appendChild(opt);
-      });
+    avaliadoresCarregados = await chamarBackend("listarAvaliadores", {});
+    const sres = [...new Set(avaliadoresCarregados.map((a) => a.sre).filter(Boolean))].sort((a, b) =>
+      a.localeCompare(b, "pt")
+    );
+    sres.forEach((sre) => {
+      const opt = document.createElement("option");
+      opt.value = sre;
+      opt.textContent = sre;
+      selectSre.appendChild(opt);
+    });
   } catch (err) {
     console.error("Erro ao carregar avaliadores:", err);
   }
 }
 
-async function selecionarAvaliador(value) {
-  const { nome, sre } = decodificarAvaliador_(value || "");
+function popularNomesPorSre(sre) {
+  const selectNome = document.getElementById("inputNomeAvaliador");
+  selectNome.innerHTML = "";
+
+  if (!sre) {
+    selectNome.disabled = true;
+    selectNome.innerHTML = `<option value="">Selecione a SRE primeiro</option>`;
+    return;
+  }
+
+  selectNome.disabled = false;
+  selectNome.innerHTML = `<option value="">Selecione seu nome</option>`;
+  avaliadoresCarregados
+    .filter((a) => a.sre === sre)
+    .sort((a, b) => a.nome.localeCompare(b.nome, "pt"))
+    .forEach(({ nome }) => {
+      const opt = document.createElement("option");
+      opt.value = nome;
+      opt.textContent = nome;
+      selectNome.appendChild(opt);
+    });
+}
+
+document.getElementById("inputSreAvaliador").addEventListener("change", () => {
+  const sre = document.getElementById("inputSreAvaliador").value;
+  popularNomesPorSre(sre);
+  selecionarAvaliador("", sre);
+});
+
+async function selecionarAvaliador(nome, sre) {
   state.avaliadorAtual = { nome, sre };
 
   document.getElementById("card-relatos").hidden = !nome;
-  const sreInfo = document.getElementById("sreAvaliadorInfo");
-  sreInfo.hidden = !nome;
-  sreInfo.textContent = nome ? `SRE: ${sre || "não informada"}` : "";
 
   state.selecionados.clear();
   state.itensAbertos.clear();
@@ -401,10 +417,14 @@ async function selecionarAvaliador(value) {
 }
 
 document.getElementById("inputNomeAvaliador").addEventListener("change", () => {
-  selecionarAvaliador(document.getElementById("inputNomeAvaliador").value);
+  const nome = document.getElementById("inputNomeAvaliador").value;
+  const sre = document.getElementById("inputSreAvaliador").value;
+  selecionarAvaliador(nome, sre);
 });
 document.getElementById("btnCarregar").addEventListener("click", () => {
-  selecionarAvaliador(document.getElementById("inputNomeAvaliador").value);
+  const nome = document.getElementById("inputNomeAvaliador").value;
+  const sre = document.getElementById("inputSreAvaliador").value;
+  selecionarAvaliador(nome, sre);
 });
 
 /* ==========================================================
