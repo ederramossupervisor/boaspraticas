@@ -29,19 +29,24 @@
   <!-- Identificação do avaliador (sempre visível) -->
   <section class="card" id="card-avaliador">
     <h2>Quem está avaliando</h2>
-    <p class="hint">Selecione seu nome para carregar seus relatos e avaliações salvas.</p>
+    <p class="hint">Selecione sua SRE e depois seu nome para carregar seus relatos e avaliações salvas.</p>
     <div class="grid-2">
       <label>
-        <span>Nome do avaliador</span>
-        <select id="inputNomeAvaliador">
-          <option value="">Selecione seu nome</option>
+        <span>SRE</span>
+        <select id="inputSreAvaliador">
+          <option value="">Selecione sua SRE</option>
         </select>
       </label>
-      <div class="actions-inline">
-        <button class="btn btn-secondary" id="btnCarregar">Carregar minhas avaliações</button>
-      </div>
+      <label>
+        <span>Nome do avaliador</span>
+        <select id="inputNomeAvaliador" disabled>
+          <option value="">Selecione a SRE primeiro</option>
+        </select>
+      </label>
     </div>
-    <p class="hint" id="sreAvaliadorInfo" hidden></p>
+    <div class="actions-inline">
+      <button class="btn btn-secondary" id="btnCarregar">Carregar minhas avaliações</button>
+    </div>
   </section>
 
   <!-- Cadastro de relatos do avaliador -->
