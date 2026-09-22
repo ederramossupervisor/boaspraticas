@@ -69,6 +69,7 @@ let state = {
   relatosCadastrados: [], // relatos cadastrados pelo avaliador atual
   selecionados: new Set(), // ids de avaliações selecionadas no resumo (para PDF em lote)
   itensAbertos: new Set(), // ids de avaliações com o detalhamento por item expandido
+  avaliadorAtual: { nome: "", sre: "" }, // avaliador selecionado (nome + SRE fixa dele)
 };
 
 /* ==========================================================
@@ -345,23 +346,47 @@ function showConfirm(message) {
 /* ==========================================================
    AVALIADOR — dropdown e troca
    ========================================================== */
+// Separador interno para combinar nome + SRE no value da <option>.
+// Cada avaliador tem uma SRE fixa (cadastrada na aba "Avaliadores"),
+// então o mesmo nome pode existir em SREs diferentes sem se misturar.
+const SEP_AVALIADOR = "::";
+
+function codificarAvaliador_(nome, sre) {
+  return `${nome}${SEP_AVALIADOR}${sre || ""}`;
+}
+function decodificarAvaliador_(value) {
+  const idx = value.indexOf(SEP_AVALIADOR);
+  if (idx === -1) return { nome: value, sre: "" };
+  return { nome: value.slice(0, idx), sre: value.slice(idx + SEP_AVALIADOR.length) };
+}
+
 async function carregarAvaliadoresDropdown() {
   const select = document.getElementById("inputNomeAvaliador");
   try {
-    const nomes = await chamarBackend("listarAvaliadores", {});
-    (nomes || []).forEach((nome) => {
-      const opt = document.createElement("option");
-      opt.value = nome;
-      opt.textContent = nome;
-      select.appendChild(opt);
-    });
+    const avaliadores = await chamarBackend("listarAvaliadores", {});
+    (avaliadores || [])
+      .slice()
+      .sort((a, b) => (a.sre || "").localeCompare(b.sre || "", "pt") || a.nome.localeCompare(b.nome, "pt"))
+      .forEach(({ nome, sre }) => {
+        const opt = document.createElement("option");
+        opt.value = codificarAvaliador_(nome, sre);
+        opt.textContent = sre ? `${nome} — SRE ${sre}` : nome;
+        select.appendChild(opt);
+      });
   } catch (err) {
     console.error("Erro ao carregar avaliadores:", err);
   }
 }
 
-async function selecionarAvaliador(nome) {
+async function selecionarAvaliador(value) {
+  const { nome, sre } = decodificarAvaliador_(value || "");
+  state.avaliadorAtual = { nome, sre };
+
   document.getElementById("card-relatos").hidden = !nome;
+  const sreInfo = document.getElementById("sreAvaliadorInfo");
+  sreInfo.hidden = !nome;
+  sreInfo.textContent = nome ? `SRE: ${sre || "não informada"}` : "";
+
   state.selecionados.clear();
   state.itensAbertos.clear();
   if (!nome) {
@@ -372,7 +397,7 @@ async function selecionarAvaliador(nome) {
     renderSelectRelato();
     return;
   }
-  await Promise.all([carregarAvaliacoes(nome), carregarRelatosCadastrados(nome)]);
+  await Promise.all([carregarAvaliacoes(nome, sre), carregarRelatosCadastrados(nome, sre)]);
 }
 
 document.getElementById("inputNomeAvaliador").addEventListener("change", () => {
@@ -385,9 +410,9 @@ document.getElementById("btnCarregar").addEventListener("click", () => {
 /* ==========================================================
    RELATOS CADASTRADOS PELO AVALIADOR
    ========================================================== */
-async function carregarRelatosCadastrados(nome) {
+async function carregarRelatosCadastrados(nome, sre) {
   try {
-    const relatos = await chamarBackend("listarRelatosCadastrados", { avaliador: nome });
+    const relatos = await chamarBackend("listarRelatosCadastrados", { avaliador: nome, sreAvaliador: sre });
     state.relatosCadastrados = relatos || [];
     renderRelatosCadastrados();
     renderSelectRelato();
@@ -447,12 +472,12 @@ function garantirOpcaoRelato(relato) {
 }
 
 document.getElementById("btnCadastrarRelato").addEventListener("click", async () => {
-  const nome = document.getElementById("inputNomeAvaliador").value;
+  const { nome, sre } = state.avaliadorAtual;
   const relato = document.getElementById("inputNovoRelato").value.trim();
   if (!nome) return showToast("Selecione seu nome de avaliador primeiro.", "error");
   if (!relato) return;
   try {
-    const relatos = await chamarBackend("cadastrarRelato", { avaliador: nome, relato });
+    const relatos = await chamarBackend("cadastrarRelato", { avaliador: nome, sreAvaliador: sre, relato });
     state.relatosCadastrados = relatos || [];
     renderRelatosCadastrados();
     renderSelectRelato();
@@ -463,12 +488,12 @@ document.getElementById("btnCadastrarRelato").addEventListener("click", async ()
 });
 
 async function removerRelatoCadastrado(relato) {
-  const nome = document.getElementById("inputNomeAvaliador").value;
+  const { nome, sre } = state.avaliadorAtual;
   if (!nome) return;
   const ok = await showConfirm(`Remover o relato ${relato} da sua lista de cadastro? (Isso não apaga uma avaliação já salva.)`);
   if (!ok) return;
   try {
-    const relatos = await chamarBackend("excluirRelatoCadastrado", { avaliador: nome, relato });
+    const relatos = await chamarBackend("excluirRelatoCadastrado", { avaliador: nome, sreAvaliador: sre, relato });
     state.relatosCadastrados = relatos || [];
     renderRelatosCadastrados();
     renderSelectRelato();
@@ -495,7 +520,8 @@ document.getElementById("inputRelato").addEventListener("change", () => {
 function coletarFormulario() {
   return {
     id: state.id || `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-    avaliador: document.getElementById("inputNomeAvaliador").value.trim(),
+    avaliador: state.avaliadorAtual.nome,
+    sreAvaliador: state.avaliadorAtual.sre,
     relato: document.getElementById("inputRelato").value.trim(),
     categoria: document.getElementById("inputCategoria").value,
     sre: document.getElementById("inputSre").value.trim(),
@@ -580,7 +606,7 @@ function setSaveStatus(msg, cls) {
 }
 
 document.getElementById("btnSalvar").addEventListener("click", async () => {
-  const nome = document.getElementById("inputNomeAvaliador").value.trim();
+  const { nome, sre } = state.avaliadorAtual;
   if (!nome) return setSaveStatus("Selecione seu nome de avaliador antes de salvar.", "err");
   if (!document.getElementById("inputRelato").value.trim())
     return setSaveStatus("Selecione o número do relato.", "err");
@@ -594,17 +620,17 @@ document.getElementById("btnSalvar").addEventListener("click", async () => {
     await chamarBackend("salvar", { avaliacao: dados });
     state.id = dados.id;
     setSaveStatus("Avaliação salva com sucesso.", "ok");
-    await Promise.all([carregarAvaliacoes(nome), carregarRelatosCadastrados(nome)]);
+    await Promise.all([carregarAvaliacoes(nome, sre), carregarRelatosCadastrados(nome, sre)]);
   } catch (err) {
     setSaveStatus("Erro ao salvar: " + err.message, "err");
   }
 });
 
-async function carregarAvaliacoes(nome) {
+async function carregarAvaliacoes(nome, sre) {
   const lista = document.getElementById("resumoLista");
   lista.innerHTML = `<p class="empty-state">Carregando...</p>`;
   try {
-    const avaliacoes = await chamarBackend("listar", { avaliador: nome });
+    const avaliacoes = await chamarBackend("listar", { avaliador: nome, sreAvaliador: sre });
     state.minhasAvaliacoes = avaliacoes || [];
     renderResumo();
   } catch (err) {
@@ -621,8 +647,8 @@ async function excluirAvaliacao(id) {
     state.selecionados.delete(id);
     state.itensAbertos.delete(id);
     renderResumo();
-    const nome = document.getElementById("inputNomeAvaliador").value;
-    if (nome) carregarRelatosCadastrados(nome);
+    const { nome, sre } = state.avaliadorAtual;
+    if (nome) carregarRelatosCadastrados(nome, sre);
   } catch (err) {
     showToast("Erro ao excluir: " + err.message, "error");
   }
@@ -890,7 +916,7 @@ async function gerarPdf(lista) {
     }
   });
 
-  const nomeAvaliador = (document.getElementById("inputNomeAvaliador").value || "avaliador").replace(/\s+/g, "-");
+  const nomeAvaliador = (state.avaliadorAtual.nome || "avaliador").replace(/\s+/g, "-");
   const nomeArquivo = lista.length === 1
     ? `avaliacao-relato-${lista[0].relato}.pdf`
     : `avaliacoes-${nomeAvaliador}.pdf`;
@@ -901,7 +927,7 @@ async function gerarPdf(lista) {
    COPIAR RESUMO COMPLETO
    ========================================================== */
 document.getElementById("btnCopiarResumo").addEventListener("click", async () => {
-  const nome = document.getElementById("inputNomeAvaliador").value || "—";
+  const nome = state.avaliadorAtual.nome || "—";
   const linhas = [`Resumo das avaliações — ${nome}`, ""];
   state.minhasAvaliacoes.forEach((av) => {
     const nota = av.condicao === "indeferido" ? "—" : Number(av.notaFinal || 0).toFixed(1);
