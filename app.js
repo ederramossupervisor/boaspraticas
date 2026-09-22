@@ -344,59 +344,27 @@ function showConfirm(message) {
 }
 
 /* ==========================================================
-   AVALIADOR — dropdown e troca
+   AVALIADOR — identificação automática pela conta Google
    ========================================================== */
-// Cada avaliador tem uma SRE fixa. O avaliador primeiro escolhe a SRE,
-// e só então o campo "Nome" é liberado, já filtrado para mostrar
-// apenas os avaliadores daquela SRE.
-let avaliadoresCarregados = []; // [{nome, sre}], carregado uma vez do backend
-
-async function carregarAvaliadoresDropdown() {
-  const selectSre = document.getElementById("inputSreAvaliador");
+// Cada avaliador tem nome/SRE fixos cadastrados na planilha, ligados
+// ao e-mail da conta Google dele. O backend identifica quem está
+// logado pela sessão (não pelo que o front-end envia), então aqui só
+// exibimos o resultado — não há mais seleção manual de nome/SRE.
+async function identificarESelecionar() {
+  const status = document.getElementById("identidadeStatus");
+  const btnCarregar = document.getElementById("btnCarregar");
+  status.textContent = "Identificando sua conta Google...";
+  btnCarregar.hidden = true;
   try {
-    avaliadoresCarregados = await chamarBackend("listarAvaliadores", {});
-    const sres = [...new Set(avaliadoresCarregados.map((a) => a.sre).filter(Boolean))].sort((a, b) =>
-      a.localeCompare(b, "pt")
-    );
-    sres.forEach((sre) => {
-      const opt = document.createElement("option");
-      opt.value = sre;
-      opt.textContent = sre;
-      selectSre.appendChild(opt);
-    });
+    const identidade = await chamarBackend("identificarAvaliador", {});
+    status.textContent = `Você está avaliando como: ${identidade.nome} — SRE ${identidade.sre || "não informada"}`;
+    btnCarregar.hidden = false;
+    await selecionarAvaliador(identidade.nome, identidade.sre);
   } catch (err) {
-    console.error("Erro ao carregar avaliadores:", err);
+    status.textContent = "Não foi possível identificar você: " + err.message;
+    await selecionarAvaliador("", "");
   }
 }
-
-function popularNomesPorSre(sre) {
-  const selectNome = document.getElementById("inputNomeAvaliador");
-  selectNome.innerHTML = "";
-
-  if (!sre) {
-    selectNome.disabled = true;
-    selectNome.innerHTML = `<option value="">Selecione a SRE primeiro</option>`;
-    return;
-  }
-
-  selectNome.disabled = false;
-  selectNome.innerHTML = `<option value="">Selecione seu nome</option>`;
-  avaliadoresCarregados
-    .filter((a) => a.sre === sre)
-    .sort((a, b) => a.nome.localeCompare(b.nome, "pt"))
-    .forEach(({ nome }) => {
-      const opt = document.createElement("option");
-      opt.value = nome;
-      opt.textContent = nome;
-      selectNome.appendChild(opt);
-    });
-}
-
-document.getElementById("inputSreAvaliador").addEventListener("change", () => {
-  const sre = document.getElementById("inputSreAvaliador").value;
-  popularNomesPorSre(sre);
-  selecionarAvaliador("", sre);
-});
 
 async function selecionarAvaliador(nome, sre) {
   state.avaliadorAtual = { nome, sre };
@@ -416,15 +384,8 @@ async function selecionarAvaliador(nome, sre) {
   await Promise.all([carregarAvaliacoes(nome, sre), carregarRelatosCadastrados(nome, sre)]);
 }
 
-document.getElementById("inputNomeAvaliador").addEventListener("change", () => {
-  const nome = document.getElementById("inputNomeAvaliador").value;
-  const sre = document.getElementById("inputSreAvaliador").value;
-  selecionarAvaliador(nome, sre);
-});
 document.getElementById("btnCarregar").addEventListener("click", () => {
-  const nome = document.getElementById("inputNomeAvaliador").value;
-  const sre = document.getElementById("inputSreAvaliador").value;
-  selecionarAvaliador(nome, sre);
+  identificarESelecionar();
 });
 
 /* ==========================================================
@@ -432,7 +393,7 @@ document.getElementById("btnCarregar").addEventListener("click", () => {
    ========================================================== */
 async function carregarRelatosCadastrados(nome, sre) {
   try {
-    const relatos = await chamarBackend("listarRelatosCadastrados", { avaliador: nome, sreAvaliador: sre });
+    const relatos = await chamarBackend("listarRelatosCadastrados", {});
     state.relatosCadastrados = relatos || [];
     renderRelatosCadastrados();
     renderSelectRelato();
@@ -497,7 +458,7 @@ document.getElementById("btnCadastrarRelato").addEventListener("click", async ()
   if (!nome) return showToast("Selecione seu nome de avaliador primeiro.", "error");
   if (!relato) return;
   try {
-    const relatos = await chamarBackend("cadastrarRelato", { avaliador: nome, sreAvaliador: sre, relato });
+    const relatos = await chamarBackend("cadastrarRelato", { relato });
     state.relatosCadastrados = relatos || [];
     renderRelatosCadastrados();
     renderSelectRelato();
@@ -513,7 +474,7 @@ async function removerRelatoCadastrado(relato) {
   const ok = await showConfirm(`Remover o relato ${relato} da sua lista de cadastro? (Isso não apaga uma avaliação já salva.)`);
   if (!ok) return;
   try {
-    const relatos = await chamarBackend("excluirRelatoCadastrado", { avaliador: nome, sreAvaliador: sre, relato });
+    const relatos = await chamarBackend("excluirRelatoCadastrado", { relato });
     state.relatosCadastrados = relatos || [];
     renderRelatosCadastrados();
     renderSelectRelato();
@@ -650,7 +611,7 @@ async function carregarAvaliacoes(nome, sre) {
   const lista = document.getElementById("resumoLista");
   lista.innerHTML = `<p class="empty-state">Carregando...</p>`;
   try {
-    const avaliacoes = await chamarBackend("listar", { avaliador: nome, sreAvaliador: sre });
+    const avaliacoes = await chamarBackend("listar", {});
     state.minhasAvaliacoes = avaliacoes || [];
     renderResumo();
   } catch (err) {
@@ -971,4 +932,4 @@ document.getElementById("btnCopiarResumo").addEventListener("click", async () =>
    ========================================================== */
 renderCriterios();
 renderScoreCard();
-carregarAvaliadoresDropdown();
+identificarESelecionar();
