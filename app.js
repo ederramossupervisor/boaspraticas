@@ -405,6 +405,7 @@ async function identificarESelecionar() {
     btnCarregar.hidden = false;
     btnSair.hidden = false;
     await selecionarAvaliador(identidade.nome, identidade.sre);
+    await ofertarRecuperarRascunho(identidade.nome, identidade.sre);
   } catch (err) {
     status.textContent = "Não foi possível identificar você: " + err.message;
     state.idToken = null;
@@ -441,6 +442,7 @@ document.getElementById("btnCarregar").addEventListener("click", () => {
 document.getElementById("btnSair").addEventListener("click", () => {
   state.idToken = null;
   selecionarAvaliador("", "");
+  rascunhoJaOfertadoNestaSessao = false; // se logar de novo, pode voltar a oferecer o rascunho
   if (window.google && google.accounts && google.accounts.id) {
     google.accounts.id.disableAutoSelect();
   }
@@ -623,7 +625,101 @@ function limparFormulario() {
   renderScoreCard();
   setSaveStatus("", "");
 }
-document.getElementById("btnNovo").addEventListener("click", limparFormulario);
+document.getElementById("btnNovo").addEventListener("click", () => {
+  limparFormulario();
+  limparRascunhoAtual();
+});
+
+/* ==========================================================
+   RASCUNHO LOCAL (localStorage)
+   Guarda automaticamente o que está sendo digitado — inclusive a
+   justificativa — no navegador, pra não perder nada se a página
+   fechar sozinha, cair a internet, etc. Cada avaliador (nome+SRE) tem
+   sua própria chave, pra não misturar rascunhos em computador
+   compartilhado. Isso é só um "backup local": o dado só conta como
+   salvo de verdade quando "Salvar avaliação" funcionar no backend.
+   ========================================================== */
+let rascunhoTimer = null;
+let rascunhoJaOfertadoNestaSessao = false;
+
+function chaveRascunho_(nome, sre) {
+  const n = String(nome || "").trim().toLowerCase();
+  const s = String(sre || "").trim().toLowerCase();
+  return `painelAvaliador_rascunho__${n}__${s}`;
+}
+
+function agendarSalvarRascunho() {
+  clearTimeout(rascunhoTimer);
+  rascunhoTimer = setTimeout(salvarRascunhoAgora, 500);
+}
+
+function salvarRascunhoAgora() {
+  const { nome, sre } = state.avaliadorAtual;
+  if (!nome) return; // só guarda rascunho de quem já está identificado
+  const relato = (document.getElementById("inputRelato").value || "").trim();
+  if (!relato) return; // nada relevante ainda pra guardar
+  try {
+    const dados = coletarFormulario();
+    localStorage.setItem(
+      chaveRascunho_(nome, sre),
+      JSON.stringify({ dados, salvoEm: new Date().toISOString() })
+    );
+  } catch (err) {
+    console.warn("Não foi possível salvar rascunho local:", err);
+  }
+}
+
+function carregarRascunho_(nome, sre) {
+  try {
+    const raw = localStorage.getItem(chaveRascunho_(nome, sre));
+    return raw ? JSON.parse(raw) : null;
+  } catch (err) {
+    return null;
+  }
+}
+
+function limparRascunhoAtual() {
+  const { nome, sre } = state.avaliadorAtual;
+  if (!nome) return;
+  try {
+    localStorage.removeItem(chaveRascunho_(nome, sre));
+  } catch (err) {
+    /* ignora */
+  }
+}
+
+// Delegação: qualquer digitação ou clique dentro do formulário agenda
+// um salvamento do rascunho (com pequeno atraso pra não gravar a
+// cada tecla).
+const tabFormEl = document.getElementById("tab-form");
+if (tabFormEl) {
+  tabFormEl.addEventListener("input", agendarSalvarRascunho);
+  tabFormEl.addEventListener("change", agendarSalvarRascunho);
+  tabFormEl.addEventListener("click", agendarSalvarRascunho);
+}
+
+// Depois de identificar o avaliador, oferece recuperar um rascunho
+// pendente (uma vez só por sessão/aba aberta, pra não ficar
+// perguntando de novo a cada "Carregar minhas avaliações").
+async function ofertarRecuperarRascunho(nome, sre) {
+  if (rascunhoJaOfertadoNestaSessao) return;
+  rascunhoJaOfertadoNestaSessao = true;
+
+  const rascunho = carregarRascunho_(nome, sre);
+  if (!rascunho || !rascunho.dados) return;
+
+  const relatoNum = rascunho.dados.relato || "(sem número)";
+  const quando = rascunho.salvoEm ? new Date(rascunho.salvoEm).toLocaleString("pt-BR") : "";
+  const ok = await showConfirm(
+    `Encontramos um rascunho não salvo do relato ${relatoNum}${quando ? ", de " + quando : ""}. Deseja recuperá-lo?`
+  );
+  if (ok) {
+    preencherFormulario(rascunho.dados);
+    showToast("Rascunho recuperado. Revise e clique em Salvar avaliação.", "success");
+  } else {
+    limparRascunhoAtual();
+  }
+}
 
 /* ==========================================================
    CHAMADAS AO BACKEND (Apps Script)
@@ -726,6 +822,7 @@ document.getElementById("btnSalvar").addEventListener("click", async () => {
     await chamarBackend("salvar", { avaliacao: dados });
     state.id = dados.id;
     setSaveStatus("Avaliação salva com sucesso.", "ok");
+    limparRascunhoAtual();
     await Promise.all([carregarAvaliacoes(nome, sre), carregarRelatosCadastrados(nome, sre)]);
   } catch (err) {
     setSaveStatus("Erro ao salvar: " + err.message, "err");
