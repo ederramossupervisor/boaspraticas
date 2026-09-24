@@ -628,15 +628,81 @@ document.getElementById("btnNovo").addEventListener("click", limparFormulario);
 /* ==========================================================
    CHAMADAS AO BACKEND (Apps Script)
    ========================================================== */
-async function chamarBackend(action, payload) {
+// O idToken do Google Identity Services vence depois de ~1h. Como o
+// avaliador costuma ficar bem mais tempo que isso preenchendo um
+// relato, qualquer chamada pode voltar com "sessão expirada" no meio
+// do trabalho. Em vez de só mostrar o erro (e arriscar perder o que
+// foi digitado), a gente reconhece essa mensagem específica, pede
+// login de novo por cima da tela atual — sem mexer no formulário — e
+// repete sozinho a mesma ação assim que a pessoa loga de novo.
+const SESSAO_EXPIRADA_REGEX = /sessão do google expirou|token inválido|token do google não corresponde|faça login com sua conta google/i;
+
+function mostrarModalReautenticacao() {
+  return new Promise((resolve) => {
+    const overlay = document.createElement("div");
+    overlay.className = "confirm-overlay open";
+    overlay.innerHTML = `
+      <div class="confirm-box">
+        <p class="confirm-message">Sua sessão do Google expirou. Entre novamente para continuar — o que você já preencheu não vai se perder.</p>
+        <div id="reauthSignInButton" style="display:flex; justify-content:center; margin-bottom:14px;"></div>
+        <div class="confirm-actions">
+          <button type="button" class="btn btn-ghost" data-reauth="cancel">Cancelar</button>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+
+    const cleanup = (idToken) => {
+      overlay.remove();
+      resolve(idToken);
+    };
+    overlay.querySelector('[data-reauth="cancel"]').addEventListener("click", () => cleanup(null));
+
+    if (!window.google || !google.accounts || !google.accounts.id) {
+      // Biblioteca do Google não carregou — não dá pra reautenticar aqui.
+      cleanup(null);
+      return;
+    }
+    google.accounts.id.initialize({
+      client_id: CONFIG.GOOGLE_CLIENT_ID,
+      callback: (response) => cleanup(response.credential),
+    });
+    google.accounts.id.renderButton(document.getElementById("reauthSignInButton"), {
+      theme: "outline",
+      size: "large",
+      text: "signin_with",
+      locale: "pt-BR",
+    });
+    // Tenta também o One Tap automático, caso o navegador permita — se
+    // a pessoa ainda está logada no Google, pode nem precisar clicar.
+    google.accounts.id.prompt();
+  });
+}
+
+async function chamarBackend(action, payload, opts) {
+  const permitirReauth = !opts || opts.permitirReauth !== false;
   const resp = await fetch(CONFIG.API_URL, {
     method: "POST",
     headers: { "Content-Type": "text/plain;charset=utf-8" }, // evita preflight CORS
     body: JSON.stringify({ action, idToken: state.idToken, ...payload }),
   });
   const data = await resp.json();
-  if (!data.ok) throw new Error(data.error || "Erro desconhecido no servidor.");
-  return data.result;
+  if (data.ok) return data.result;
+
+  const msg = data.error || "Erro desconhecido no servidor.";
+  const podeReautenticar = permitirReauth && action !== "identificarAvaliador" && SESSAO_EXPIRADA_REGEX.test(msg);
+  if (!podeReautenticar) throw new Error(msg);
+
+  const novoToken = await mostrarModalReautenticacao();
+  if (!novoToken) throw new Error(msg);
+  state.idToken = novoToken;
+
+  // Revalida a identidade com o token novo antes de repetir a ação original.
+  const identidade = await chamarBackend("identificarAvaliador", {}, { permitirReauth: false });
+  state.avaliadorAtual = { nome: identidade.nome, sre: identidade.sre };
+  const status = document.getElementById("identidadeStatus");
+  if (status) status.textContent = `Você está avaliando como: ${identidade.nome} — SRE ${identidade.sre || "não informada"}`;
+
+  return chamarBackend(action, payload, { permitirReauth: false });
 }
 
 function setSaveStatus(msg, cls) {
