@@ -77,6 +77,7 @@ let state = {
   itensAbertos: new Set(), // ids de avaliações com o detalhamento por item expandido
   avaliadorAtual: { nome: "", sre: "" }, // avaliador identificado (nome + SRE fixa dele)
   idToken: null, // JWT do Google Identity Services, obtido no login
+  filtroEnvio: "todos", // filtro do resumo: todos | pendentes | enviados
 };
 
 /* ==========================================================
@@ -851,6 +852,11 @@ async function excluirAvaliacao(id) {
     state.minhasAvaliacoes = state.minhasAvaliacoes.filter((a) => a.id !== id);
     state.selecionados.delete(id);
     state.itensAbertos.delete(id);
+    const envios = lerEnvios_();
+    if (envios[id]) {
+      delete envios[id];
+      gravarEnvios_(envios);
+    }
     renderResumo();
     const { nome, sre } = state.avaliadorAtual;
     if (nome) carregarRelatosCadastrados(nome, sre);
@@ -862,6 +868,103 @@ async function excluirAvaliacao(id) {
 /* ==========================================================
    RENDER — RESUMO
    ========================================================== */
+/* ==========================================================
+   CONTROLE DE ENVIO AO FORMULÁRIO OFICIAL
+   Registra, por avaliação, se o avaliador já enviou o resultado ao
+   formulário da Sedu. O registro fica no navegador (localStorage),
+   separado por avaliador (nome+SRE). Junto com a data, guarda uma
+   "assinatura" da avaliação (nota, condição, justificativa e notas
+   por item): se ela for editada depois do envio, o painel avisa que
+   é preciso reenviar.
+   ========================================================== */
+const FORM_URL = "https://forms.gle/LQriKBYtuo2KoHYXA";
+
+function chaveEnvios_() {
+  const n = String(state.avaliadorAtual.nome || "").trim().toLowerCase();
+  const s = String(state.avaliadorAtual.sre || "").trim().toLowerCase();
+  return `painelAvaliador_enviados__${n}__${s}`;
+}
+
+function lerEnvios_() {
+  try {
+    return JSON.parse(localStorage.getItem(chaveEnvios_()) || "{}") || {};
+  } catch (err) {
+    return {};
+  }
+}
+
+function gravarEnvios_(obj) {
+  try {
+    localStorage.setItem(chaveEnvios_(), JSON.stringify(obj));
+    return true;
+  } catch (err) {
+    showToast("Não foi possível registrar o envio neste navegador.", "error");
+    return false;
+  }
+}
+
+function assinaturaAvaliacao_(av) {
+  const scores = av.scores || {};
+  const itens = Object.keys(scores)
+    .sort()
+    .map((k) => `${k}=${Number(scores[k])}`)
+    .join(",");
+  const base = [
+    String(av.relato || "").trim(),
+    av.condicao || "",
+    av.condicao === "indeferido" ? "-" : Number(av.notaFinal || 0).toFixed(1),
+    String(av.justificativa || "").trim(),
+    itens,
+  ].join("|");
+  let h = 5381;
+  for (let i = 0; i < base.length; i++) h = ((h << 5) + h + base.charCodeAt(i)) >>> 0;
+  return h.toString(36);
+}
+
+// Retorna { tipo: "pendente" | "enviado" | "alterada", em }
+function statusEnvio_(av, envios) {
+  const reg = (envios || lerEnvios_())[av.id];
+  if (!reg) return { tipo: "pendente" };
+  if (reg.sig !== assinaturaAvaliacao_(av)) return { tipo: "alterada", em: reg.em };
+  return { tipo: "enviado", em: reg.em };
+}
+
+function marcarEnviado_(ids) {
+  const envios = lerEnvios_();
+  const agora = new Date().toISOString();
+  let qtd = 0;
+  ids.forEach((id) => {
+    const av = state.minhasAvaliacoes.find((a) => a.id === id);
+    if (!av) return;
+    envios[id] = { em: agora, sig: assinaturaAvaliacao_(av) };
+    qtd++;
+  });
+  if (qtd && gravarEnvios_(envios)) renderResumo();
+  return qtd;
+}
+
+function desmarcarEnviado_(id) {
+  const envios = lerEnvios_();
+  delete envios[id];
+  if (gravarEnvios_(envios)) renderResumo();
+}
+
+function formatarDataEnvio_(iso) {
+  const d = new Date(iso);
+  if (isNaN(d)) return "";
+  const dia = d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+  const hora = d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+  return `${dia} às ${hora}`;
+}
+
+function badgeEnvioHtml_(st) {
+  if (st.tipo === "enviado")
+    return `<span class="envio-badge enviado"><i class="fa-solid fa-circle-check" aria-hidden="true"></i> Enviado em ${formatarDataEnvio_(st.em)}</span>`;
+  if (st.tipo === "alterada")
+    return `<span class="envio-badge alterada"><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i> Alterada após o envio de ${formatarDataEnvio_(st.em)} — reenvie</span>`;
+  return `<span class="envio-badge pendente"><i class="fa-regular fa-clock" aria-hidden="true"></i> Pendente de envio</span>`;
+}
+
 function buildDetalhesHtml(av) {
   if (av.condicao === "indeferido") {
     return `<p class="relato-item-line"><span>Relato indeferido — não pontuado nos critérios.</span></p>`;
@@ -886,15 +989,60 @@ function renderResumo() {
   badge.hidden = n === 0;
   badge.textContent = n;
 
+  const barra = document.getElementById("envioBar");
+
   if (n === 0) {
+    if (barra) barra.innerHTML = "";
     lista.innerHTML = `<p class="empty-state">Nenhuma avaliação encontrada para este nome ainda.</p>`;
     return;
   }
 
-  lista.innerHTML = state.minhasAvaliacoes
+  const envios = lerEnvios_();
+  const statusPorId = {};
+  state.minhasAvaliacoes.forEach((av) => (statusPorId[av.id] = statusEnvio_(av, envios)));
+  const qtdEnviados = state.minhasAvaliacoes.filter((av) => statusPorId[av.id].tipo === "enviado").length;
+  const qtdPendentes = n - qtdEnviados;
+
+  if (barra) {
+    const pill = (f, rotulo) =>
+      `<button type="button" class="filtro-pill ${state.filtroEnvio === f ? "selected" : ""}" data-filtro-envio="${f}">${rotulo}</button>`;
+    barra.innerHTML = `
+      <div class="envio-resumo ${qtdPendentes === 0 ? "completo" : ""}">
+        <i class="fa-solid ${qtdPendentes === 0 ? "fa-circle-check" : "fa-paper-plane"}" aria-hidden="true"></i>
+        <span><strong>${qtdEnviados} de ${n}</strong> enviados ao formulário${qtdPendentes === 0 ? " — tudo em dia!" : ` · ${qtdPendentes} pendente${qtdPendentes > 1 ? "s" : ""}`}</span>
+      </div>
+      <div class="filtro-envio">
+        ${pill("todos", `Todos (${n})`)}
+        ${pill("pendentes", `Pendentes (${qtdPendentes})`)}
+        ${pill("enviados", `Enviados (${qtdEnviados})`)}
+      </div>`;
+    barra.querySelectorAll("[data-filtro-envio]").forEach((btn) =>
+      btn.addEventListener("click", () => {
+        state.filtroEnvio = btn.dataset.filtroEnvio;
+        renderResumo();
+      })
+    );
+  }
+
+  const visiveis = state.minhasAvaliacoes.filter((av) => {
+    const enviado = statusPorId[av.id].tipo === "enviado";
+    if (state.filtroEnvio === "pendentes") return !enviado;
+    if (state.filtroEnvio === "enviados") return enviado;
+    return true;
+  });
+
+  if (visiveis.length === 0) {
+    lista.innerHTML = `<p class="empty-state">${
+      state.filtroEnvio === "pendentes" ? "Nenhum relato pendente de envio." : "Nenhum relato enviado ainda."
+    }</p>`;
+    return;
+  }
+
+  lista.innerHTML = visiveis
     .slice()
     .sort((a, b) => String(a.relato || "").localeCompare(String(b.relato || ""), "pt", { numeric: true }))
     .map((av) => {
+      const st = statusPorId[av.id];
       const nota = av.condicao === "indeferido" ? "—" : Number(av.notaFinal || 0).toFixed(1);
       const marcado = state.selecionados.has(av.id);
       const aberto = state.itensAbertos.has(av.id);
@@ -907,6 +1055,7 @@ function renderResumo() {
                 <p class="relato-title">Relato nº ${av.relato || "—"}</p>
                 <p class="relato-meta">${av.categoria || "categoria não informada"}${av.sre ? " · " + av.sre : ""}</p>
                 <span class="relato-status ${av.condicao}">${av.condicao === "indeferido" ? "Indeferido" : "Deferido"}</span>
+                ${badgeEnvioHtml_(st)}
               </div>
             </label>
             <div class="relato-nota">${nota}<small>${av.condicao === "indeferido" ? "" : "/ 100"}</small></div>
@@ -920,6 +1069,12 @@ function renderResumo() {
             <p class="relato-justif">${escapeHtml(av.justificativa)}</p>
           </div>` : ""}
           <div class="relato-actions">
+            ${
+              st.tipo === "enviado"
+                ? `<button class="btn btn-ghost" data-envio-desmarcar="${av.id}"><i class="fa-solid fa-rotate-left" aria-hidden="true"></i> Desmarcar envio</button>`
+                : `<a class="btn btn-ghost" href="${FORM_URL}" target="_blank" rel="noopener"><i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i> Abrir formulário</a>
+                   <button class="btn btn-envio" data-envio-marcar="${av.id}"><i class="fa-solid fa-check" aria-hidden="true"></i> Marcar como enviado</button>`
+            }
             <button class="btn btn-ghost" data-edit="${av.id}">Editar</button>
             <button class="btn btn-ghost" data-toggle-itens="${av.id}">${aberto ? "Ocultar notas por item" : "Ver notas por item"}</button>
             <button class="btn btn-ghost" data-pdf="${av.id}">Baixar PDF</button>
@@ -930,6 +1085,15 @@ function renderResumo() {
     })
     .join("");
 
+  lista.querySelectorAll("[data-envio-marcar]").forEach((btn) =>
+    btn.addEventListener("click", () => {
+      marcarEnviado_([btn.dataset.envioMarcar]);
+      showToast("Relato marcado como enviado.", "success");
+    })
+  );
+  lista.querySelectorAll("[data-envio-desmarcar]").forEach((btn) =>
+    btn.addEventListener("click", () => desmarcarEnviado_(btn.dataset.envioDesmarcar))
+  );
   lista.querySelectorAll("[data-edit]").forEach((btn) =>
     btn.addEventListener("click", () => {
       const av = state.minhasAvaliacoes.find((a) => a.id === btn.dataset.edit);
@@ -984,6 +1148,14 @@ function escapeHtml(str) {
 /* ==========================================================
    SELEÇÃO, EXIBIÇÃO NA TELA E PDF
    ========================================================== */
+document.getElementById("btnMarcarEnviados").addEventListener("click", () => {
+  if (state.selecionados.size === 0) {
+    showToast("Selecione ao menos um relato na lista para marcar como enviado.", "error");
+    return;
+  }
+  const qtd = marcarEnviado_([...state.selecionados]);
+  if (qtd) showToast(`${qtd} relato${qtd > 1 ? "s" : ""} marcado${qtd > 1 ? "s" : ""} como enviado${qtd > 1 ? "s" : ""}.`, "success");
+});
 document.getElementById("btnSelecionarTodos").addEventListener("click", () => {
   const todosMarcados = state.minhasAvaliacoes.length > 0 &&
     state.minhasAvaliacoes.every((av) => state.selecionados.has(av.id));
