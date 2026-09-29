@@ -422,3 +422,13 @@ textarea { resize: vertical; }
 .escala-tag.yellow { background: var(--yellow-soft); color: #8A6300; }
 .escala-tag.cyan { background: var(--cyan-soft); color: var(--navy); }
 .escala-tag.pink { background: var(--pink-soft); color: var(--pink); }
+
+/* Ícones Font Awesome (substituem os emojis) */
+.link-btn i, .fab-criterios i, .toggle-label i { line-height: 1; }
+.toggle-label { display: inline-flex; align-items: center; gap: 8px; }
+.chev { display: inline-flex; align-items: center; font-size: 13px; }
+.modal-close { display: inline-flex; align-items: center; justify-content: center; padding: 4px; }
+.modal-close i { font-size: 20px; }
+.btn-copy-justif { display: inline-flex; align-items: center; gap: 5px; }
+.btn-copy-justif i { font-size: 12px; }
+.fab-criterios i { font-size: 18px; }
