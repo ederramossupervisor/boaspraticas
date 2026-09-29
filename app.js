@@ -1,3 +1,5 @@
+const ICON_COPY = '<i class="fa-regular fa-copy" aria-hidden="true"></i>';
+
 /* ==========================================================
    CONFIGURAÇÃO
    Depois de publicar o Code.gs como app da Web, cole aqui a
@@ -913,7 +915,7 @@ function renderResumo() {
           <div class="relato-justif-wrap">
             <div class="relato-justif-head">
               <span class="relato-justif-label">Justificativa</span>
-              <button type="button" class="btn-copy-justif" data-copy-justif="${av.id}" title="Copiar justificativa">📋 Copiar</button>
+              <button type="button" class="btn-copy-justif" data-copy-justif="${av.id}" title="Copiar justificativa">${ICON_COPY} Copiar</button>
             </div>
             <p class="relato-justif">${escapeHtml(av.justificativa)}</p>
           </div>` : ""}
@@ -963,9 +965,9 @@ function renderResumo() {
       if (!av || !av.justificativa) return;
       try {
         await navigator.clipboard.writeText(av.justificativa);
-        const original = btn.textContent;
+        const original = btn.innerHTML;
         btn.textContent = "Copiado!";
-        setTimeout(() => (btn.textContent = original), 1500);
+        setTimeout(() => (btn.innerHTML = original), 1500);
       } catch (e) {
         showToast("Não foi possível copiar automaticamente. Selecione o texto manualmente.", "error");
       }
