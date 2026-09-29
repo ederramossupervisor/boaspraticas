@@ -432,3 +432,33 @@ textarea { resize: vertical; }
 .btn-copy-justif { display: inline-flex; align-items: center; gap: 5px; }
 .btn-copy-justif i { font-size: 12px; }
 .fab-criterios i { font-size: 18px; }
+
+/* ===== Controle de envio ao formulário ===== */
+:root { --ok: #2E8B57; --ok-soft: #DDF1E6; }
+.envio-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-top: 14px; }
+.envio-resumo {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: var(--yellow-soft); color: var(--navy);
+  border-radius: 999px; padding: 7px 14px; font-size: 13px;
+}
+.envio-resumo.completo { background: var(--ok-soft); color: var(--ok); }
+.filtro-envio { display: flex; gap: 6px; flex-wrap: wrap; }
+.filtro-pill {
+  cursor: pointer; border: 1px solid var(--line); background: var(--cream); color: var(--navy);
+  border-radius: 999px; padding: 6px 12px; font-size: 12.5px; font-weight: 600;
+  font-family: 'Baloo 2', ui-sans-serif, system-ui, sans-serif;
+}
+.filtro-pill.selected { background: var(--navy); color: var(--cream); border-color: var(--navy); }
+
+.envio-badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 11px; font-weight: 600; border-radius: 999px;
+  padding: 2px 9px; margin: 4px 0 0 6px;
+}
+.envio-badge.pendente { background: var(--yellow-soft); color: #8A6410; }
+.envio-badge.enviado { background: var(--ok-soft); color: var(--ok); }
+.envio-badge.alterada { background: var(--pink-soft); color: var(--pink); }
+
+.btn-envio { background: var(--ok); color: #fff; }
+.relato-actions .btn i, #btnMarcarEnviados i { margin-right: 4px; }
+a.btn { text-decoration: none; display: inline-flex; align-items: center; }
