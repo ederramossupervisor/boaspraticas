@@ -4,6 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Painel do Avaliador · Prêmio Sedu Boas Práticas</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
 <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -22,9 +23,9 @@
 <main class="wrap">
 
   <div class="links-uteis">
-    <a class="link-btn" href="https://drive.google.com/file/d/19ztAYvFON-tjgyhSqFpGd_CrvrjRyG0b/view?usp=sharing" target="_blank" rel="noopener">📄 Portaria nº 177-R</a>
-    <a class="link-btn" href="https://drive.google.com/file/d/1u9ePRr5IMGBfs8DezOzgbzRyvO2JRTVj/view?usp=sharing" target="_blank" rel="noopener">📘 Manual do Avaliador</a>
-    <a class="link-btn" href="https://forms.gle/LQriKBYtuo2KoHYXA" target="_blank" rel="noopener">📝 Formulário de avaliação</a>
+    <a class="link-btn" href="https://drive.google.com/file/d/19ztAYvFON-tjgyhSqFpGd_CrvrjRyG0b/view?usp=sharing" target="_blank" rel="noopener"><i class="fa-solid fa-file-lines" aria-hidden="true"></i> Portaria nº 177-R</a>
+    <a class="link-btn" href="https://drive.google.com/file/d/1u9ePRr5IMGBfs8DezOzgbzRyvO2JRTVj/view?usp=sharing" target="_blank" rel="noopener"><i class="fa-solid fa-book-open" aria-hidden="true"></i> Manual do Avaliador</a>
+    <a class="link-btn" href="https://forms.gle/LQriKBYtuo2KoHYXA" target="_blank" rel="noopener"><i class="fa-solid fa-clipboard-check" aria-hidden="true"></i> Formulário de avaliação</a>
   </div>
 
   <!-- Identificação do avaliador (sempre visível) -->
@@ -121,8 +122,8 @@
 
         <div class="card">
           <button type="button" class="collapsible-toggle" id="toggleArbitro">
-            <span>⚖️ Sou avaliador árbitro para este relato</span>
-            <span class="chev">▾</span>
+            <span class="toggle-label"><i class="fa-solid fa-scale-balanced" aria-hidden="true"></i> Sou avaliador árbitro para este relato</span>
+            <span class="chev"><i class="fa-solid fa-chevron-down" aria-hidden="true"></i></span>
           </button>
           <div id="arbitroBody" hidden>
             <div class="notice notice-pink">
@@ -190,14 +191,14 @@
 
 <!-- Botão flutuante: consulta rápida dos critérios -->
 <button type="button" class="fab-criterios" id="btnAbrirCriterios" onclick="abrirModalCriterios()" title="Consultar escala de notas">
-  📊 <span>Escala de notas</span>
+  <i class="fa-solid fa-chart-simple" aria-hidden="true"></i> <span>Escala de notas</span>
 </button>
 
 <div class="modal-overlay" id="modalCriteriosOverlay" onclick="if(event.target.id==='modalCriteriosOverlay') document.getElementById('modalCriteriosOverlay').classList.remove('open')">
   <div class="modal-box">
     <div class="modal-head">
       <h2>Escala de notas</h2>
-      <button type="button" class="modal-close" id="btnFecharCriterios" onclick="document.getElementById('modalCriteriosOverlay').classList.remove('open')">✕</button>
+      <button type="button" class="modal-close" id="btnFecharCriterios" onclick="document.getElementById('modalCriteriosOverlay').classList.remove('open')"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
     </div>
     <div class="modal-body" id="modalCriteriosBody"><!-- renderizado via JS --></div>
   </div>
